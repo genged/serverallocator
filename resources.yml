@@ -1,0 +1,70 @@
+# ---
+nodes:
+  - name: node1
+    resources:
+      memory: 32GiB
+      cpu: 10
+  - name: node2
+    resources:
+      memory: 32GiB
+      cpu: 12
+  - name: node3
+    resources:
+      memory: 32GiB
+      cpu: 8
+  - name: node4
+    resources:
+      memory: 16GiB
+      cpu: 12
+
+apps:
+  - name: someapp1
+    resources:
+      memory: 4GiB
+      cpu: 2
+  - name: someapp2
+    resources:
+      memory: 8GiB
+      cpu: 4
+  - name: someapp3
+    resources:
+      memory: 12GiB
+      cpu: 12
+  - name: someapp4
+    resources:
+      memory: 16GiB
+      cpu: 8
+  - name: someapp5
+    resources:
+      memory: 16GiB
+      cpu: 4
+  - name: someapp6
+    resources:
+      memory: 10GiB
+      cpu: 4
+  - name: someapp7
+    resources:
+      memory: 4GiB
+      cpu: 2
+  - name: someapp7
+    resources:
+      memory: 8GiB
+      cpu: 2
+  - name: cluster1-node1
+    resources:
+      memory: 4GiB
+      cpu: 4
+    antiAffinityLabels:
+      - cluster1
+  - name: cluster1-node2
+    resources:
+      memory: 24GiB
+      cpu: 8
+    antiAffinityLabels:
+      - cluster1
+  - name: cluster1-node3
+    resources:
+      memory: 12GiB
+      cpu: 2
+    antiAffinityLabels:
+      - cluster1

@@ -143,9 +143,8 @@ def allocate_tasks_servers(servers_memory, servers_cpu,
     print('  - solutions found : %i' % solution_printer.solution_count())
 
 
-
 if __name__ == '__main__':
-    # Data.
+    # Sample Data
     servers_memory = [
         32, 32, 32, 16
     ]
@@ -160,13 +159,7 @@ if __name__ == '__main__':
         2, 4,  12, 8, 1,
         2, 4,  4,  2, 2
     ]
-
     task_anti_affinity = [(1, 4), (3, 7), (3, 4), (6, 8)]
-
-    #    t1 t2 t3
-    # s1 4  0
-    # s2 0  8
-    # s3 0  0
 
     allocate_tasks_servers(servers_memory, servers_cpu, tasks_memory, tasks_cpu, task_anti_affinity=task_anti_affinity)
 
