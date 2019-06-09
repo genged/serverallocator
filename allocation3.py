@@ -62,7 +62,19 @@ def enforce_mem_allocation(model, t, s, memory_alloc, tasks_memory):
     model.Add(memory_alloc[(t, s)] == 0).OnlyEnforceIf(b_mem.Not())
 
 
-def allocate_tasks_servers(servers_memory, servers_cpu, tasks_memory, tasks_cpu, num_solutions=1):
+def enforce_anti_affinity(model, cpu_alloc, task_anti_affinity, all_servers):
+    for (t1, t2) in task_anti_affinity:
+        for s in all_servers:
+            t2_assigned = model.NewBoolVar("t2_assigned")
+            model.Add(cpu_alloc[t2, s] > 0).OnlyEnforceIf(t2_assigned)
+            model.Add(cpu_alloc[t2, s] == 0).OnlyEnforceIf(t2_assigned.Not())
+
+            model.Add(cpu_alloc[t1, s] == 0).OnlyEnforceIf(t2_assigned)
+
+
+def allocate_tasks_servers(servers_memory, servers_cpu,
+                           tasks_memory, tasks_cpu,
+                           num_solutions=1, task_anti_affinity=None):
 
     all_servers = range(len(servers_memory))
     all_tasks = range(len(tasks_memory))
@@ -100,6 +112,14 @@ def allocate_tasks_servers(servers_memory, servers_cpu, tasks_memory, tasks_cpu,
         for s in all_servers:
             enforce_mem_cpu_correlated(model, t, s, cpu_alloc, memory_alloc, tasks_cpu, tasks_memory)
 
+    if task_anti_affinity:
+        enforce_anti_affinity(model, cpu_alloc, task_anti_affinity, all_servers)
+
+   #   0   0
+   #   val 0
+   #   0   val
+   #XX val val
+
     # Creates the solver and solve.
     solver = cp_model.CpSolver()
     solver.parameters.linearization_level = 0
@@ -108,7 +128,11 @@ def allocate_tasks_servers(servers_memory, servers_cpu, tasks_memory, tasks_cpu,
     solution_printer = ServerAllocationSolutionPrinter(memory_alloc, cpu_alloc,
                                                        servers_memory, servers_cpu,
                                                        len(tasks_memory), a_few_solutions)
-    solver.SearchForAllSolutions(model, solution_printer)
+    status = solver.SearchForAllSolutions(model, solution_printer)
+
+    print('Solve status: %s' % solver.StatusName(status))
+    if status == cp_model.OPTIMAL:
+        print('Optimal objective value: %i' % solver.ObjectiveValue())
 
     # Statistics.
     print()
@@ -119,10 +143,11 @@ def allocate_tasks_servers(servers_memory, servers_cpu, tasks_memory, tasks_cpu,
     print('  - solutions found : %i' % solution_printer.solution_count())
 
 
+
 if __name__ == '__main__':
     # Data.
     servers_memory = [
-        32, 48, 32, 16
+        32, 32, 32, 16
     ]
     servers_cpu = [
         10, 12, 8, 12
@@ -136,10 +161,12 @@ if __name__ == '__main__':
         2, 4,  4,  2, 2
     ]
 
+    task_anti_affinity = [(1, 4), (3, 7), (3, 4), (6, 8)]
+
     #    t1 t2 t3
     # s1 4  0
     # s2 0  8
     # s3 0  0
 
-    allocate_tasks_servers(servers_memory, servers_cpu, tasks_memory, tasks_cpu)
+    allocate_tasks_servers(servers_memory, servers_cpu, tasks_memory, tasks_cpu, task_anti_affinity=task_anti_affinity)
 
