@@ -16,24 +16,26 @@ class ServerAllocationSolutionPrinter(cp_model.CpSolverSolutionCallback):
         self._servers_memory = servers_memory
         self._servers_cpu = servers_cpu
 
-        self._solutions = set(num_sols_required)
+        self._num_solutions = num_sols_required
         self._solution_count = 0
+        self._solutions = []
 
     def on_solution_callback(self):
-        if self._solution_count in self._solutions:
-            print("Solution", self._solution_count)
+        if self._solution_count < self._num_solutions:
+            solution = []
             for s in range(self._servers):
-                print("Server ", s, "(Mem %s, CPU %s)" % (self._servers_memory[s], self._servers_cpu[s]))
                 for t in range(self._tasks_count):
                     if self.Value(self._mem_alloc[(t, s)]) > 0 and self.Value(self._cpu_alloc[(t, s)]) > 0:
-                        print("\tTask ", t,
-                              "(Mem %s, CPU %s)" % (self.Value(self._mem_alloc[(t, s)]), self.Value(self._cpu_alloc[(t, s)])))
-            print()
+                        solution.append((t, s))
 
+            self._solutions.append(solution)
         self._solution_count += 1
 
     def solution_count(self):
         return self._solution_count
+
+    def get_solutions(self):
+        return self._solutions
 
 
 def enforce_mem_cpu_correlated(model, t, s, cpu_alloc, memory_alloc, tasks_cpu, tasks_memory):
@@ -74,7 +76,8 @@ def enforce_anti_affinity(model, cpu_alloc, task_anti_affinity, all_servers):
 
 def allocate_tasks_servers(servers_memory, servers_cpu,
                            tasks_memory, tasks_cpu,
-                           num_solutions=1, task_anti_affinity=None):
+                           task_anti_affinity=None,
+                           num_solutions=1):
 
     all_servers = range(len(servers_memory))
     all_tasks = range(len(tasks_memory))
@@ -115,51 +118,28 @@ def allocate_tasks_servers(servers_memory, servers_cpu,
     if task_anti_affinity:
         enforce_anti_affinity(model, cpu_alloc, task_anti_affinity, all_servers)
 
-   #   0   0
-   #   val 0
-   #   0   val
-   #XX val val
-
     # Creates the solver and solve.
     solver = cp_model.CpSolver()
     solver.parameters.linearization_level = 0
     # Display the first five solutions.
-    a_few_solutions = range(num_solutions)
+
     solution_printer = ServerAllocationSolutionPrinter(memory_alloc, cpu_alloc,
                                                        servers_memory, servers_cpu,
-                                                       len(tasks_memory), a_few_solutions)
+                                                       len(tasks_memory), num_solutions)
     status = solver.SearchForAllSolutions(model, solution_printer)
+    solutions = solution_printer.get_solutions()
 
-    print('Solve status: %s' % solver.StatusName(status))
-    if status == cp_model.OPTIMAL:
-        print('Optimal objective value: %i' % solver.ObjectiveValue())
+    #print('Solve status: %s' % solver.StatusName(status))
+    #if status == cp_model.OPTIMAL:
+    #    print('Optimal objective value: %i' % solver.ObjectiveValue())
 
     # Statistics.
-    print()
-    print('Statistics')
-    print('  - conflicts       : %i' % solver.NumConflicts())
-    print('  - branches        : %i' % solver.NumBranches())
-    print('  - wall time       : %f s' % solver.WallTime())
-    print('  - solutions found : %i' % solution_printer.solution_count())
+    #print()
+    #print('Statistics')
+    #print('  - conflicts       : %i' % solver.NumConflicts())
+    #print('  - branches        : %i' % solver.NumBranches())
+    #print('  - wall time       : %f s' % solver.WallTime())
+    #print('  - solutions found : %i' % solution_printer.solution_count())
 
-
-if __name__ == '__main__':
-    # Sample Data
-    servers_memory = [
-        32, 32, 32, 16
-    ]
-    servers_cpu = [
-        10, 12, 8, 12
-    ]
-    tasks_memory = [
-        4, 8,  12, 16, 2,
-        8, 16, 10, 4,  8
-    ]
-    tasks_cpu = [
-        2, 4,  12, 8, 1,
-        2, 4,  4,  2, 2
-    ]
-    task_anti_affinity = [(1, 4), (3, 7), (3, 4), (6, 8)]
-
-    allocate_tasks_servers(servers_memory, servers_cpu, tasks_memory, tasks_cpu, task_anti_affinity=task_anti_affinity)
+    return solutions
 

@@ -1,6 +1,7 @@
 from pathlib import Path
 import yaml
 import humanfriendly
+import itertools
 
 
 class ConfigException(Exception):
@@ -32,13 +33,12 @@ def parse_config(yaml_dict: dict) -> tuple:
                 else:
                     labels[label].append((app_name, id))
 
-    import itertools
     task_anti_affinity = []
     for key in labels.keys():
         idlist = [id for (app_name, id) in labels[key]]
         task_anti_affinity.extend(list(itertools.combinations(idlist, 2)))
 
-    return nodes_cpu, nodes_memory, apps_cpu, apps_memory, task_anti_affinity
+    return nodes_cpu, nodes_memory, apps_cpu, apps_memory, task_anti_affinity, yaml_dict
 
 
 def mem_to_gib(mem_str: str) -> int:
@@ -64,3 +64,4 @@ if __name__ == "__main__":
     print("Apps CPU", apps_cpu)
     print("Apps Mem", apps_memory)
     print("Anti Affinity", task_anti_affinity)
+

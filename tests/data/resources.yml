@@ -11,7 +11,7 @@ nodes:
   - name: node3
     resources:
       memory: 32GiB
-      cpu: 8
+      cpu: 24
   - name: node4
     resources:
       memory: 16GiB
@@ -58,13 +58,13 @@ apps:
       - cluster1
   - name: cluster1-node2
     resources:
-      memory: 24GiB
+      memory: 4GiB
       cpu: 8
     antiAffinityLabels:
       - cluster1
   - name: cluster1-node3
     resources:
-      memory: 12GiB
+      memory: 2GiB
       cpu: 2
     antiAffinityLabels:
       - cluster1
