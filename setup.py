@@ -27,6 +27,7 @@ def get_long_description():
 
     return long_description
 
+
 setuptools.setup(
     name="allocation",
     version="0.5",

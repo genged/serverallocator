@@ -2,20 +2,20 @@
 nodes:
   - name: node1
     resources:
-      memory: 32GiB
-      cpu: 10
+      memory: 64GiB
+      cpu: 24
   - name: node2
     resources:
       memory: 32GiB
-      cpu: 12
+      cpu: 24
   - name: node3
     resources:
       memory: 32GiB
       cpu: 24
   - name: node4
     resources:
-      memory: 16GiB
-      cpu: 12
+      memory: 32GiB
+      cpu: 24
 
 apps:
   - name: someapp1
@@ -46,7 +46,7 @@ apps:
     resources:
       memory: 4GiB
       cpu: 2
-  - name: someapp7
+  - name: someapp77
     resources:
       memory: 8GiB
       cpu: 2
@@ -68,3 +68,11 @@ apps:
       cpu: 2
     antiAffinityLabels:
       - cluster1
+  - name: someapp8
+    resources:
+      memory: 12GiB
+      cpu: 24
+  - name: someapp9
+    resources:
+      memory: 12GiB
+      cpu: 8
