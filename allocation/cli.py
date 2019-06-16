@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import sys
 import yaml
 import argparse
@@ -36,8 +38,8 @@ def main():
         for s in itertools.groupby(alloc, lambda x: x[1]):
             node_id = s[0]
             node_data = data_dict["nodes"][node_id]
-            print("Server %s - %s (Mem %s, CPU %s)" % (node_id, node_data["name"],
-                                                       node_data["resources"]["memory"], node_data["resources"]["cpu"]))
+            #print("Server %s - %s (Mem %s, CPU %s)" % (node_id, node_data["name"],
+            #                                           node_data["resources"]["memory"], node_data["resources"]["cpu"]))
             allocation_dict[node_data["name"]] = {
                 "apps": []
             }
@@ -45,10 +47,10 @@ def main():
                 task_id = t[0]
                 task_data = data_dict["apps"][task_id]
                 allocation_dict[node_data["name"]]["apps"].append(task_data["name"])
-                print("\tApp %s - %s (Mem %s, CPU %s)" % (task_id, task_data["name"],
-                                                          task_data["resources"]["memory"], task_data["resources"]["cpu"]))
+                #print("\tApp %s - %s (Mem %s, CPU %s)" % (task_id, task_data["name"],
+                #                                          task_data["resources"]["memory"], task_data["resources"]["cpu"]))
 
-    print(allocation_dict)
+    #print(allocation_dict)
     allocation_file = p.allocation_file
     if not allocation_file:
         allocation_file = sys.stdout

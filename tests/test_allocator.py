@@ -30,7 +30,9 @@ class TestAllocator(unittest.TestCase):
 
     def test_allocate_tasks_servers_single_server_task(self):
         alloc = allocator.Allocator([allocator.Server(32, 16, 1000)], [allocator.App(12, 12, 500)])
-        self.assertEqual([[(0, 0)]], alloc.allocate())
+        res = alloc.allocate()
+        print(res)
+        self.assertEqual([[(0, 0)]], res)
 
     def test_allocate_tasks_servers_more_servers(self):
         alloc = allocator.Allocator([allocator.Server(32, 16, 1000), allocator.Server(32, 16, 1000)],
