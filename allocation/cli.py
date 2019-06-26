@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 
 import sys
+# yaml is not in requirements.txt
 import yaml
 import argparse
 import itertools
 from pathlib import Path
 
+# allocation -> allocator_config -> allocate_task_servers...;;;;;;;;; may be it's better to choose
+# different name modeling
 from allocation.allocator_config import get_config_data
 from allocation.allocator import allocate_tasks_servers
 
@@ -30,10 +33,10 @@ def main():
         "cpu": apps_cpu
     }
 
-    allocation = allocate_tasks_servers(nodes, apps,
-                                        task_anti_affinity=task_anti_affinity)
+    allocation = allocate_tasks_servers(nodes, apps, task_anti_affinity=task_anti_affinity)
 
     allocation_dict = {}
+    # no puppy will die if, you already know if what...
     for s in itertools.groupby(allocation, lambda x: x[1]):
         node_id = s[0]
         node_data = data_dict["nodes"][node_id]

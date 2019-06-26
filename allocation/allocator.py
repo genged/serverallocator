@@ -5,10 +5,13 @@ import random
 from dataclasses import dataclass, field
 from typing import List, Dict
 
+# ortools are not in requirements.txt
 from ortools.sat.python import cp_model
 
 
 def enforce_resources_correlated(model, t, s, r1, r2, alloc, tasks):
+    # no puppy will die if t-> task, s-> server
+    # give docstrings with types
     b_same = model.NewBoolVar('b_same_%s_%s' % (r1, r2))
     model.Add(alloc[(t, s, r1)] == tasks[r1][t]).OnlyEnforceIf(b_same)
     model.Add(alloc[(t, s, r1)] != tasks[r1][t]).OnlyEnforceIf(b_same.Not())
@@ -18,6 +21,8 @@ def enforce_resources_correlated(model, t, s, r1, r2, alloc, tasks):
 
 
 def enforce_mem_cpu_correlated(model, t, s, cpu_alloc, memory_alloc, tasks_cpu, tasks_memory):
+    # this one and above are pretty similar...
+    # no puppy will die if t-> task, s-> server
     b_same = model.NewBoolVar('b_same')
     model.Add(cpu_alloc[(t, s)] == tasks_cpu[t]).OnlyEnforceIf(b_same)
     model.Add(cpu_alloc[(t, s)] != tasks_cpu[t]).OnlyEnforceIf(b_same.Not())
@@ -37,6 +42,9 @@ def enforce_resource_allocation(model, resource, task, server, alloc, tasks):
 
 
 def enforce_anti_affinity(model, alloc, task_anti_affinity, all_servers, all_resources):
+    # 1. give meaningful variable names: no puppy will die if variable will be named 'server' instead of 's'
+    # 2. arrow anti-pattern: too many nested for-s. use itertools.product
+    # 3. no puppy will die if t-> task, s-> server
     for (t1, t2) in task_anti_affinity:
         for s in all_servers:
             for r in all_resources:
@@ -51,15 +59,19 @@ def allocate_tasks_servers(servers: Dict[str, List],
                            tasks: Dict[str, List],
                            task_anti_affinity=None,
                            minimize=True):
+    # too long function...
 
     if not servers or not tasks:
         raise ValueError("Incorrect arguments passed")
 
+    # what is '2'? and why '2'?
     for rlist1, rlist2 in itertools.combinations(servers.values(), 2):
         if len(rlist1) != len(rlist2):
             raise ValueError("Servers CPU and Memory should be of the same length")
 
+    # .values() is enouph
     all_servers = range(max(len(v) for k, v in servers.items()))
+    # .values() is enouph
     all_tasks = range(max(len(v) for k, v in tasks.items()))
     all_resources = servers.keys()
     # Creates the model.
@@ -67,6 +79,10 @@ def allocate_tasks_servers(servers: Dict[str, List],
 
     # resource_alloc[(t, s, r)]: task 't' runs on server 's' with resource 'r' has value resource_alloc[(t, s, r)]
     resource_alloc = {}
+    # 1.try to use itertools. its more laconic. and no arrow anti-pattern
+    #   for task, server, resource in product(all_tasks, all_servers, all_resources)
+    # 2. you're lucky that every list size < 100....
+    # 3. no puppy will die if t-> task, s-> server
     for t in all_tasks:
         for s in all_servers:
             for r in all_resources:
@@ -75,21 +91,35 @@ def allocate_tasks_servers(servers: Dict[str, List],
 
     # Make sure memory allocation is exact per task
     # (Otherwise may be split between servers, e.g. S1 will get T0 with 1GB and S2 will get T0 with the rest 3GB)
+    # 1. try to use itertools. its more laconic. and no arrow anti-pattern
+    # 2. you're lucky that every list size < 100....
+    # 3. no puppy will die if t-> task, s-> server
+    # 4. gi've comment why do you need two different loops: this one and one above
     for t in all_tasks:
         for s in all_servers:
             for r in all_resources:
                 enforce_resource_allocation(model, r, t, s, resource_alloc, tasks)
 
     # Each task can run only on one server
+    # try to use itertools. its more laconic. and no arrow anti-pattern
+    # 2. you're lucky that every list size < 100....
+    # 3. no puppy will die if t-> task, r-> resource
     for t in all_tasks:
         for r in all_resources:
             model.Add(sum(resource_alloc[(t, s, r)] for s in all_servers) == tasks[r][t])
 
     # Each server can run only tasks smaller than the the total amount of memory
+    # 1. try to use itertools. its more laconic. and no arrow anti-pattern
+    # 2. you're lucky that every list size < 100....
+
     for s in all_servers:
         for r in all_resources:
             model.Add(sum(resource_alloc[(t, s, r)] for t in all_tasks) <= servers[r][s])
 
+    # try to use itertools. its more laconic. and no arrow anti-pattern
+    # 2. you're lucky that every list size < 100....
+    # 3. no puppy will die if t-> task, s-> server
+    # 4. what is the purpose of the loop?
     for t in all_tasks:
         for s in all_servers:
             for (r1, r2) in itertools.combinations(all_resources, 2):
@@ -114,9 +144,18 @@ def allocate_tasks_servers(servers: Dict[str, List],
 
     status = solver.Solve(model)
     solution = []
+    # avoid arrow AP: if status not in {cp_model.OPTIMAL, cp_model.FEASIBLE}: return xyz
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+        # try to use itertools. its more laconic. and no arrow anti-pattern
         for s in all_servers:
             for t in all_tasks:
+                # but not here - really hard to understand. I'd do follings as:
+                #   for resource in all_resources:
+                #       if solver.Value(resource_alloc[(task, server, resource)]) <= 0:
+                #          break
+                #   else:
+                #       # all is OK
+                #       solution.append((t, s))
                 if all(solver.Value(resource_alloc[(t, s, r)]) > 0 for r in all_resources):
                     solution.append((t, s))
 
@@ -146,10 +185,14 @@ def random_name(prefix="name", name_len=10):
     return "%s-%s" % (prefix, rand_str)
 
 
+# well, looks like there's not too much "payload" (BL) un the function
+# maybe just use: random_server_name = partial(random_name, "server")
 def random_server_name(prefix="server"):
     return random_name(prefix)
 
 
+# well, looks like there's not too much "payload" (BL) un the function
+# maybe just use: random_server_name = partial(random_name, "app")
 def random_app_name(prefix="app"):
     return random_name(prefix)
 
