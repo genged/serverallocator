@@ -30,27 +30,21 @@ def main():
         "cpu": apps_cpu
     }
 
-    allocations = allocate_tasks_servers(nodes, apps,
-                                         task_anti_affinity=task_anti_affinity)
+    allocation = allocate_tasks_servers(nodes, apps,
+                                        task_anti_affinity=task_anti_affinity)
 
     allocation_dict = {}
-    for alloc in allocations:
-        for s in itertools.groupby(alloc, lambda x: x[1]):
-            node_id = s[0]
-            node_data = data_dict["nodes"][node_id]
-            #print("Server %s - %s (Mem %s, CPU %s)" % (node_id, node_data["name"],
-            #                                           node_data["resources"]["memory"], node_data["resources"]["cpu"]))
-            allocation_dict[node_data["name"]] = {
-                "apps": []
-            }
-            for t in s[1]:
-                task_id = t[0]
-                task_data = data_dict["apps"][task_id]
-                allocation_dict[node_data["name"]]["apps"].append(task_data["name"])
-                #print("\tApp %s - %s (Mem %s, CPU %s)" % (task_id, task_data["name"],
-                #                                          task_data["resources"]["memory"], task_data["resources"]["cpu"]))
+    for s in itertools.groupby(allocation, lambda x: x[1]):
+        node_id = s[0]
+        node_data = data_dict["nodes"][node_id]
+        allocation_dict[node_data["name"]] = {
+            "apps": []
+        }
+        for t in s[1]:
+            task_id = t[0]
+            task_data = data_dict["apps"][task_id]
+            allocation_dict[node_data["name"]]["apps"].append(task_data["name"])
 
-    #print(allocation_dict)
     allocation_file = p.allocation_file
     if not allocation_file:
         allocation_file = sys.stdout

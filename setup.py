@@ -49,4 +49,6 @@ setuptools.setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
+    setup_requires=['nose>=1.0'],
+    test_suite='nose.collector'
 )

@@ -1,5 +1,8 @@
 import itertools
-from dataclasses import dataclass
+import string
+import random
+
+from dataclasses import dataclass, field
 from typing import List, Dict
 
 from ortools.sat.python import cp_model
@@ -117,8 +120,6 @@ def allocate_tasks_servers(servers: Dict[str, List],
                 if all(solver.Value(resource_alloc[(t, s, r)]) > 0 for r in all_resources):
                     solution.append((t, s))
 
-    solutions = [solution]
-
     # print('Solve status: %s' % solver.StatusName(status))
     #
     # print()
@@ -127,7 +128,7 @@ def allocate_tasks_servers(servers: Dict[str, List],
     # print('  - branches        : %i' % solver.NumBranches())
     # print('  - wall time       : %f s' % solver.WallTime())
 
-    return solutions
+    return solution
 
 # ----
 
@@ -139,16 +140,29 @@ class AllocationResource:
     disk: int
 
 
+def random_name(prefix="name", name_len=10):
+    letters = string.ascii_lowercase
+    rand_str = ''.join(random.choices(letters, k=name_len))
+    return "%s-%s" % (prefix, rand_str)
+
+
+def random_server_name(prefix="server"):
+    return random_name(prefix)
+
+
+def random_app_name(prefix="app"):
+    return random_name(prefix)
+
+
 @dataclass
 class Server(AllocationResource):
-    name: str = None
-    antiAffinityLabels: List[str] = None
+    name: str = field(default_factory=random_server_name)
 
 
 @dataclass
 class App(AllocationResource):
-    name: str = None
-    antiAffinityLabels: List[str] = None
+    name: str = field(default_factory=random_app_name)
+    antiAffinityLabels: List[str] = field(default=None)
 
 
 class Allocator:
@@ -163,30 +177,43 @@ class Allocator:
             servers[field_name] = [getattr(s, field_name) for s in self.servers]
 
         apps = {}
-
         for field_name in AllocationResource.__dataclass_fields__.keys():
             apps[field_name] = [getattr(a, field_name) for a in self.apps]
 
-        allocations = allocate_tasks_servers(servers, apps, minimize=self.minimize)
-        #
-        # for alloc in allocations:
-        #     for s in itertools.groupby(alloc, lambda x: x[1]):
-        #         node_id = s[0]
-        #         node_data = servers[node_id]
-        #         print("Server %s - %s (Mem %s, CPU %s)" % (node_id, node_data.name,
-        #                                                    node_data.memory, node_data.cpu))
-        #         allocation_dict[node_data.name] = {
-        #             "apps": []
-        #         }
-        #         for t in s[1]:
-        #             task_id = t[0]
-        #             task_data = data_dict["apps"][task_id]
-        #             allocation_dict[node_data["name"]]["apps"].append(task_data["name"])
-        #             print("\tApp %s - %s (Mem %s, CPU %s)" % (task_id, task_data["name"],
-        #                                                       task_data["resources"]["memory"], task_data["resources"]["cpu"]))
-        #
+        # Create anti-affinity pairs of tasks (tasks that cannot run on the same server)
+        # E.g. [(1,2), (4,6)] - App 1 and 2 cannot run on same server, App 4 and 6 cannot run on same server
+        task_anti_affinity = []
+        labels = {}
+        for appid, app in enumerate(self.apps):
+            if app.antiAffinityLabels:
+                for label in app.antiAffinityLabels:
+                    labels.setdefault(label, []).append(appid)
 
-        return allocations
+        if labels:
+            for app_list in labels.values():
+                task_anti_affinity.extend(list(itertools.combinations(app_list, 2)))
+
+        alloc = allocate_tasks_servers(servers, apps, minimize=self.minimize, task_anti_affinity=task_anti_affinity)
+        res = []
+
+        def get_node(app_node_tuple: tuple):
+            return app_node_tuple[1]
+
+        def get_app(app_node_tuple: tuple):
+            return app_node_tuple[0]
+
+        for node in itertools.groupby(alloc, get_node):
+            res_alloc = {}
+            node_id = node[0]
+            node_tuples = node[1]
+            node_data = self.servers[node_id]
+
+            apps = [get_app(app_node_tuple) for app_node_tuple in node_tuples]
+            res_alloc["node"] = node_data
+            res_alloc["apps"] = [self.apps[app_id] for app_id in apps]
+            res.append(res_alloc)
+
+        return res
 
 
 
