@@ -29,6 +29,6 @@ print(alloc.allocate())
 ```
 Outputs:
 ```python
-# [(taskid, serverid), ...]
-[[(0, 0)]]
+[{'node': Server(memory=32, cpu=16, disk=1000, name='server-rroledczuc'), 
+  'apps': [App(memory=12, cpu=12, disk=500, name='app-fxvedwnjkg', antiAffinityLabels=None)]}]
 ```
