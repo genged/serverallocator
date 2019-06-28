@@ -14,5 +14,9 @@
 #     2, 4,  4,  2, 2
 # ]
 # task_anti_affinity = [(1, 4), (3, 7), (3, 4), (6, 8)]
+if __name__ == "__main__":
+    from src.allocation import allocator
+    alloc = allocator.Allocator([allocator.Server(32, 16, 1000)], [allocator.App(12, 12, 500)])
+    print(alloc.allocate())
 
 

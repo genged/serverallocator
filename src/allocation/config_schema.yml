@@ -1,0 +1,43 @@
+nodes:
+  type: list
+  required: true
+  schema:
+    type: dict
+    required: true
+    schema:
+      name:
+        type: string
+        required: true
+      resources:
+        type: dict
+        required: true
+        schema:
+          memory:
+            type: string
+            required: true
+          cpu:
+            type: integer
+            required: true
+apps:
+  type: list
+  required: true
+  schema:
+    type: dict
+    required: true
+    schema:
+      name:
+        type: string
+        required: true
+      resources:
+        type: dict
+        required: true
+        schema:
+          memory:
+            type: string
+            required: true
+          cpu:
+            type: integer
+            required: true
+      antiAffinityLabels:
+        type: list
+        required: false

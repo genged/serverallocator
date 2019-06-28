@@ -1,0 +1,10 @@
+# ---
+nodes:
+  - name: node1
+    resources:
+      memory: 64GiB
+      cpu: 24
+apps:
+  - name: someapp1
+    resources:
+      cpu: 2

@@ -1,6 +1,7 @@
 import itertools
 import string
 import random
+import functools
 
 from dataclasses import dataclass, field
 from typing import List, Dict
@@ -8,27 +9,19 @@ from typing import List, Dict
 from ortools.sat.python import cp_model
 
 
-def enforce_resources_correlated(model, t, s, r1, r2, alloc, tasks):
+def enforce_resources_correlated(model: cp_model.CpModel, task, server, r1, r2, alloc, tasks):
     b_same = model.NewBoolVar('b_same_%s_%s' % (r1, r2))
-    model.Add(alloc[(t, s, r1)] == tasks[r1][t]).OnlyEnforceIf(b_same)
-    model.Add(alloc[(t, s, r1)] != tasks[r1][t]).OnlyEnforceIf(b_same.Not())
+    model.Add(alloc[(task, server, r1)] == tasks[r1][task]).OnlyEnforceIf(b_same)
+    model.Add(alloc[(task, server, r1)] != tasks[r1][task]).OnlyEnforceIf(b_same.Not())
 
-    model.Add(alloc[(t, s, r2)] == tasks[r2][t]).OnlyEnforceIf(b_same)
-    model.Add(alloc[(t, s, r2)] == 0).OnlyEnforceIf(b_same.Not())
-
-
-def enforce_mem_cpu_correlated(model, t, s, cpu_alloc, memory_alloc, tasks_cpu, tasks_memory):
-    b_same = model.NewBoolVar('b_same')
-    model.Add(cpu_alloc[(t, s)] == tasks_cpu[t]).OnlyEnforceIf(b_same)
-    model.Add(cpu_alloc[(t, s)] != tasks_cpu[t]).OnlyEnforceIf(b_same.Not())
-
-    model.Add(memory_alloc[(t, s)] == tasks_memory[t]).OnlyEnforceIf(b_same)
-    model.Add(memory_alloc[(t, s)] == 0).OnlyEnforceIf(b_same.Not())
+    model.Add(alloc[(task, server, r2)] == tasks[r2][task]).OnlyEnforceIf(b_same)
+    model.Add(alloc[(task, server, r2)] == 0).OnlyEnforceIf(b_same.Not())
 
 
-def enforce_resource_allocation(model, resource, task, server, alloc, tasks):
-    b_resource = model.NewBoolVar('b_resource')
+def enforce_resource_allocation(model: cp_model.CpModel, resource, task, server, alloc, tasks):
     idx = (task, server, resource)
+    b_resource = model.NewBoolVar('b_resource_%s_%s_%s' % idx)
+
     # Implement b_resource == (alloc[(t, s, r)] == tasks[r][t])
     model.Add(alloc[idx] != tasks[resource][task]).OnlyEnforceIf(b_resource.Not())
     model.Add(alloc[idx] == tasks[resource][task]).OnlyEnforceIf(b_resource)
@@ -36,7 +29,7 @@ def enforce_resource_allocation(model, resource, task, server, alloc, tasks):
     model.Add(alloc[idx] == 0).OnlyEnforceIf(b_resource.Not())
 
 
-def enforce_anti_affinity(model, alloc, task_anti_affinity, all_servers, all_resources):
+def enforce_anti_affinity(model: cp_model.CpModel, alloc, task_anti_affinity, all_servers, all_resources):
     for (t1, t2) in task_anti_affinity:
         for s in all_servers:
             for r in all_resources:
@@ -59,51 +52,42 @@ def allocate_tasks_servers(servers: Dict[str, List],
         if len(rlist1) != len(rlist2):
             raise ValueError("Servers CPU and Memory should be of the same length")
 
-    all_servers = range(max(len(v) for k, v in servers.items()))
-    all_tasks = range(max(len(v) for k, v in tasks.items()))
+    all_servers = range(max(len(v) for v in servers.values()))
+    all_tasks = range(max(len(v) for v in tasks.values()))
     all_resources = servers.keys()
     # Creates the model.
     model = cp_model.CpModel()
 
-    # resource_alloc[(t, s, r)]: task 't' runs on server 's' with resource 'r' has value resource_alloc[(t, s, r)]
     resource_alloc = {}
-    for t in all_tasks:
-        for s in all_servers:
-            for r in all_resources:
-                resource_alloc[(t, s, r)] = model.NewIntVar(0, max(servers[r]),
-                                                            'resource_alloc_t%i_s%i_r%s' % (t, s, r))
+    for (task, server, resource) in itertools.product(all_tasks, all_servers, all_resources):
+        # resource_alloc[(t, s, r)]: task 't' runs on server 's' with resource 'r' has value resource_alloc[(t, s, r)]
+        resource_alloc[(task, server, resource)] = model.NewIntVar(0, max(servers[resource]),
+                                                                   'resource_alloc_t%i_s%i_r%s' % (task, server, resource))
 
-    # Make sure memory allocation is exact per task
-    # (Otherwise may be split between servers, e.g. S1 will get T0 with 1GB and S2 will get T0 with the rest 3GB)
-    for t in all_tasks:
-        for s in all_servers:
-            for r in all_resources:
-                enforce_resource_allocation(model, r, t, s, resource_alloc, tasks)
+        # Make sure memory allocation is exact per task
+        # (Otherwise may be split between servers, e.g. S1 will get T0 with 1GB and S2 will get T0 with the rest 3GB)
+        enforce_resource_allocation(model, resource, task, server, resource_alloc, tasks)
 
     # Each task can run only on one server
-    for t in all_tasks:
-        for r in all_resources:
-            model.Add(sum(resource_alloc[(t, s, r)] for s in all_servers) == tasks[r][t])
+    for (task, resource) in itertools.product(all_tasks, all_resources):
+        model.Add(sum(resource_alloc[(task, _server, resource)] for _server in all_servers) == tasks[resource][task])
 
     # Each server can run only tasks smaller than the the total amount of memory
-    for s in all_servers:
-        for r in all_resources:
-            model.Add(sum(resource_alloc[(t, s, r)] for t in all_tasks) <= servers[r][s])
+    for (server, resource) in itertools.product(all_servers, all_resources):
+        model.Add(sum(resource_alloc[(_task, server, resource)] for _task in all_tasks) <= servers[resource][server])
 
-    for t in all_tasks:
-        for s in all_servers:
-            for (r1, r2) in itertools.combinations(all_resources, 2):
-                enforce_resources_correlated(model, t, s, r1, r2, resource_alloc, tasks)
+    for (task, server) in itertools.product(all_tasks, all_servers):
+        for (r1, r2) in itertools.combinations(all_resources, 2):
+            enforce_resources_correlated(model, task, server, r1, r2, resource_alloc, tasks)
 
     if task_anti_affinity:
         enforce_anti_affinity(model, resource_alloc, task_anti_affinity, all_servers, all_resources)
 
     if minimize:
         server_allocated = [model.NewBoolVar('server_allocated_%i' % s) for s in all_servers]
-        for s in all_servers:
-            for r in all_resources:
-                model.Add(sum(resource_alloc[(t, s, r)] for t in all_tasks) > 0).OnlyEnforceIf(server_allocated[s])
-                model.Add(sum(resource_alloc[(t, s, r)] for t in all_tasks) <= 0).OnlyEnforceIf(server_allocated[s].Not())
+        for (server, resource) in itertools.product(all_servers, all_resources):
+            model.Add(sum(resource_alloc[(t, server, resource)] for t in all_tasks) > 0).OnlyEnforceIf(server_allocated[server])
+            model.Add(sum(resource_alloc[(t, server, resource)] for t in all_tasks) <= 0).OnlyEnforceIf(server_allocated[server].Not())
 
         model.Add(sum(server_allocated) <= len(all_servers))
         model.Minimize(sum(server_allocated))
@@ -115,10 +99,9 @@ def allocate_tasks_servers(servers: Dict[str, List],
     status = solver.Solve(model)
     solution = []
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
-        for s in all_servers:
-            for t in all_tasks:
-                if all(solver.Value(resource_alloc[(t, s, r)]) > 0 for r in all_resources):
-                    solution.append((t, s))
+        for (server, task) in itertools.product(all_servers, all_tasks):
+            if all(solver.Value(resource_alloc[(task, server, r)]) > 0 for r in all_resources):
+                solution.append((task, server))
 
     # print('Solve status: %s' % solver.StatusName(status))
     #
@@ -133,25 +116,21 @@ def allocate_tasks_servers(servers: Dict[str, List],
 # ----
 
 
-@dataclass
-class AllocationResource:
-    memory: int
-    cpu: int
-    disk: int
-
-
 def random_name(prefix="name", name_len=10):
     letters = string.ascii_lowercase
     rand_str = ''.join(random.choices(letters, k=name_len))
     return "%s-%s" % (prefix, rand_str)
 
 
-def random_server_name(prefix="server"):
-    return random_name(prefix)
+random_server_name = functools.partial(random_name, "server")
+random_app_name = functools.partial(random_name, "app")
 
 
-def random_app_name(prefix="app"):
-    return random_name(prefix)
+@dataclass
+class AllocationResource:
+    memory: int
+    cpu: int
+    disk: int
 
 
 @dataclass
@@ -214,7 +193,6 @@ class Allocator:
             res.append(res_alloc)
 
         return res
-
 
 
 if __name__ == "__main__":

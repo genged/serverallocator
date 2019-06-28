@@ -6,8 +6,8 @@ import argparse
 import itertools
 from pathlib import Path
 
-from allocation.allocator_config import get_config_data
-from allocation.allocator import allocate_tasks_servers
+from . import allocator_config
+from . import allocator
 
 
 def main():
@@ -19,7 +19,7 @@ def main():
     nodes_cpu, nodes_memory, \
         apps_cpu, apps_memory, \
         task_anti_affinity, \
-        data_dict = get_config_data(p.resources_file)
+        data_dict = allocator_config.parse_config(p.resources_file)
 
     nodes = {
         "memory": nodes_memory,
@@ -30,8 +30,8 @@ def main():
         "cpu": apps_cpu
     }
 
-    allocation = allocate_tasks_servers(nodes, apps,
-                                        task_anti_affinity=task_anti_affinity)
+    allocation = allocator.allocate_tasks_servers(nodes, apps,
+                                                  task_anti_affinity=task_anti_affinity)
 
     allocation_dict = {}
     for s in itertools.groupby(allocation, lambda x: x[1]):
